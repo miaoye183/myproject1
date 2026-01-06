@@ -1,0 +1,2255 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>失语症研究与对话模拟平台</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome -->
+    <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+
+    <!-- Tailwind 配置 -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#6366f1',
+                        secondary: '#8b5cf6',
+                        accent: '#a78bfa',
+                        dark: '#1e1b4b',
+                        light: '#f0f9ff'
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                        display: ['Montserrat', 'sans-serif']
+                    },
+                }
+            }
+        }
+    </script>
+
+    <!-- 自定义样式 -->
+    <style>
+        /* 全局动画样式 */
+        .fade-in {
+            animation: fadeIn 1s ease-in-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .scroll-trigger {
+            opacity: 0;
+            transform: translateY(20px);
+            transition: opacity 0.8s ease, transform 0.8s ease;
+        }
+
+        .scroll-visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .bento-card {
+            transition: all 0.3s ease;
+        }
+
+        .bento-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+        }
+
+        /* 平滑滚动 */
+        html {
+            scroll-behavior: smooth;
+        }
+
+        body {
+            background-color: #f8fafc;
+        }
+
+        /* 渐变背景 */
+        .gradient-bg {
+            background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+        }
+
+        .gradient-text {
+            background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+            background-clip: text;
+            -webkit-background-clip: text;
+            color: transparent;
+        }
+
+        /* Wernicke失语症特殊样式 */
+        .wernicke-message {
+            position: relative;
+            padding: 12px;
+            background: linear-gradient(135deg, rgba(139, 92, 246, 0.1) 0%, rgba(167, 139, 250, 0.05) 100%);
+            border-left: 4px solid #8b5cf6;
+            animation: wernicke-pulse 3s infinite alternate;
+        }
+
+        @keyframes wernicke-pulse {
+            0% { box-shadow: 0 0 0px rgba(139, 92, 246, 0.2); }
+            100% { box-shadow: 0 0 10px rgba(139, 92, 246, 0.4); }
+        }
+
+        .confusion-indicator {
+            display: inline-block;
+            padding: 2px 8px;
+            background: linear-gradient(135deg, #f59e0b, #ef4444);
+            border-radius: 12px;
+            font-size: 0.75rem;
+            margin-left: 8px;
+            color: white;
+            font-weight: bold;
+        }
+
+        /* 大脑图像样式 */
+        .brain-image-container {
+            position: relative;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            width: fit-content;
+            max-width: 60%;
+            max-height: 400px;
+            padding: 0.5rem; /* 减小内边距，使边框更紧凑 */
+            background-color: #f8fafc;
+            border-radius: 8px; /* 相应调整圆角 */
+            overflow: hidden;
+            border: 0.0625rem solid #e2e8f0; /* 宽度减半(原2px -> 1px)，使用rem单位 */
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            box-sizing: border-box;
+            
+            /* 定位调整：精确居中，移除偏移，保留缩放 */
+            /* 居中原理：父容器使用mx-auto实现水平居中，内部图片通过flex布局在容器内居中 */
+            transform: scale(0.6); 
+            transform-origin: center center;
+            margin: 0 auto; /* 确保容器在父元素中水平居中 */
+            transition: all 0.5s ease;
+        }
+
+        /* 响应式调整 */
+        @media (max-width: 768px) {
+            .brain-image-container {
+                max-width: 85%;
+                padding: 0.5rem;
+                /* 移动端调整：移除偏移，调整缩放 */
+                transform: scale(0.8);
+            }
+        }
+
+        .brain-image {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+            transition: transform 0.3s ease;
+            cursor: zoom-in;
+            display: block;
+        }
+
+        .brain-image.zoomed {
+            cursor: grab;
+        }
+
+        .brain-image.zoomed:active {
+            cursor: grabbing;
+        }
+
+        .zoom-level {
+            position: absolute;
+            top: 12px;
+            left: 12px;
+            background: rgba(255, 255, 255, 0.9);
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: #374151;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            z-index: 10;
+        }
+
+        /* 语音状态指示器 */
+        .voice-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+
+        .voice-indicator.listening {
+            background-color: #ef4444;
+            animation: pulse 1.5s infinite;
+        }
+
+        .voice-indicator.speaking {
+            background-color: #3b82f6;
+            animation: pulse 1.5s infinite;
+        }
+
+        .voice-indicator.ready {
+            background-color: #10b981;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        /* 滚动条隐藏 */
+        .scrollbar-hide::-webkit-scrollbar {
+            display: none;
+        }
+
+        .scrollbar-hide {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+
+        /* 混乱度控制滑块 */
+        .confusion-slider {
+            -webkit-appearance: none;
+            width: 100%;
+            height: 8px;
+            border-radius: 4px;
+            background: linear-gradient(90deg, #10b981 0%, #f59e0b 50%, #ef4444 100%);
+            outline: none;
+        }
+
+        .confusion-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background: #6366f1;
+            cursor: pointer;
+            border: 3px solid white;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+            transition: transform 0.2s;
+        }
+
+        .confusion-slider::-webkit-slider-thumb:hover {
+            transform: scale(1.1);
+        }
+
+        /* 修复文字被遮挡的问题 */
+        .flex.items-start {
+            min-height: 44px !important;
+            padding-top: 8px !important;
+            padding-bottom: 8px !important;
+        }
+
+        .flex.items-start i {
+            flex-shrink: 0 !important;
+        }
+
+        /* 修复space-y类导致的文字遮挡 */
+        .space-y-3 > * + * {
+            margin-top: 0 !important;
+        }
+    </style>
+</head>
+<body class="font-sans text-gray-800">
+    <!-- 导航栏 -->
+    <nav id="navbar" class="fixed w-full top-0 z-50 transition-all duration-300 bg-white/80 backdrop-blur shadow-sm">
+        <div class="container mx-auto px-4 py-3 flex items-center justify-between">
+            <div class="flex items-center space-x-2">
+                <i class="fa fa-brain text-primary text-2xl"></i>
+                <span class="text-xl font-bold gradient-text">失语症研究平台</span>
+            </div>
+
+            <!-- 桌面导航 -->
+            <div class="hidden md:flex items-center space-x-8">
+                <a href="#overview" class="text-gray-700 hover:text-primary transition-colors">项目概述</a>
+                <a href="#aphasia-types" class="text-gray-700 hover:text-primary transition-colors">失语症类型</a>
+                <a href="#brain-areas" class="text-gray-700 hover:text-primary transition-colors">脑区可视化</a>
+                <a href="#simulation" class="text-gray-700 hover:text-primary transition-colors">对话模拟</a>
+                <a href="#references" class="text-gray-700 hover:text-primary transition-colors">参考文献</a>
+            </div>
+
+            <!-- 移动端菜单按钮 -->
+            <button id="menu-toggle" class="md:hidden text-gray-700 hover:text-primary">
+                <i class="fa fa-bars text-2xl"></i>
+            </button>
+        </div>
+
+        <!-- 移动端导航菜单 -->
+        <div id="mobile-menu" class="hidden md:hidden bg-white shadow-lg absolute w-full">
+            <div class="container mx-auto px-4 py-2 flex flex-col space-y-3">
+                <a href="#overview" class="py-2 text-gray-700 hover:text-primary transition-colors">项目概述</a>
+                <a href="#aphasia-types" class="py-2 text-gray-700 hover:text-primary transition-colors">失语症类型</a>
+                <a href="#brain-areas" class="py-2 text-gray-700 hover:text-primary transition-colors">脑区可视化</a>
+                <a href="#simulation" class="py-2 text-gray-700 hover:text-primary transition-colors">对话模拟</a>
+                <a href="#references" class="py-2 text-gray-700 hover:text-primary transition-colors">参考文献</a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- 英雄区 -->
+    <section class="pt-32 pb-20 gradient-bg text-white">
+        <div class="container mx-auto px-4">
+            <div class="scroll-trigger max-w-4xl mx-auto text-center">
+                <h1 class="text-[clamp(2.5rem,5vw,4rem)] font-bold mb-6 text-shadow">
+                    失语症研究与对话模拟
+                </h1>
+                <p class="text-[clamp(1rem,2vw,1.25rem)] mb-8 text-white/90 leading-relaxed">
+                    探索大脑语言功能，模拟Broca失语症和Wernicke失语症的对话模式，
+                    了解脑损伤如何影响人类语言表达与理解。
+                </p>
+                <div class="flex flex-col sm:flex-row items-center justify-center gap-4">
+                    <a href="#simulation" class="px-8 py-3 bg-white text-primary font-semibold rounded-full hover:bg-opacity-90 transition-all shadow-lg">
+                        体验对话模拟
+                    </a>
+                    <a href="#aphasia-types" class="px-8 py-3 border-2 border-white text-white font-semibold rounded-full hover:bg-white/10 transition-all">
+                        了解失语症
+                    </a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- 项目概述 -->
+    <section id="overview" class="py-20 bg-white">
+        <div class="container mx-auto px-4">
+            <div class="scroll-trigger text-center mb-16">
+                <h2 class="text-[clamp(1.8rem,3vw,2.5rem)] font-bold mb-4 gradient-text">项目概述</h2>
+                <div class="w-24 h-1 bg-gradient-to-r from-primary to-secondary mx-auto mb-6 rounded-full"></div>
+                <p class="text-gray-600 max-w-3xl mx-auto">
+                    本项目旨在创建一个交互式平台，通过模拟和可视化展示，帮助人们理解脑损伤如何影响语言功能，
+                    提高对失语症患者的认知和支持。
+                </p>
+            </div>
+
+            <!-- 便当盒网格布局 -->
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                <!-- 项目目标卡片 -->
+                <div class="scroll-trigger bg-light rounded-2xl p-8 shadow-lg hover:shadow-xl transition-shadow bento-card">
+                    <div class="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mb-6">
+                        <i class="fa fa-bullseye text-primary text-2xl"></i>
+                    </div>
+                    <h3 class="text-xl font-bold mb-4 text-dark">项目目标</h3>
+                    <ul class="text-gray-700"> <!-- 已移除space-y-3 -->
+                        <li class="flex items-start min-h-[40px] py-1">
+                            <i class="fa fa-check-circle text-primary mt-1 mr-3 flex-shrink-0"></i>
+                            <span>创建交互式平台展示失语症对话模式</span>
+                        </li>
+                        <li class="flex items-start min-h-[40px] py-1">
+                            <i class="fa fa-check-circle text-primary mt-1 mr-3 flex-shrink-0"></i>
+                            <span>可视化大脑语言功能区域</span>
+                        </li>
+                        <li class="flex items-start min-h-[40px] py-1">
+                            <i class="fa fa-check-circle text-primary mt-1 mr-3 flex-shrink-0"></i>
+                            <span>提高公众对失语症的认知</span>
+                        </li>
+                    </ul>
+                </div>
+
+                <!-- 核心功能卡片 -->
+                <div class="scroll-trigger bg-light rounded-2xl p-8 shadow-lg hover:shadow-xl transition-shadow bento-card">
+                    <div class="w-16 h-16 bg-secondary/10 rounded-full flex items-center justify-center mb-6">
+                        <i class="fa fa-cogs text-secondary text-2xl"></i>
+                    </div>
+                    <h3 class="text-xl font-bold mb-4 text-dark">核心功能</h3>
+                    <ul class="text-gray-700"> <!-- 已移除space-y-3 -->
+                        <li class="flex items-start min-h-[40px] py-1">
+                            <i class="fa fa-check-circle text-secondary mt-1 mr-3 flex-shrink-0"></i>
+                            <span>Broca失语症对话模拟</span>
+                        </li>
+                        <li class="flex items-start min-h-[40px] py-1">
+                            <i class="fa fa-check-circle text-secondary mt-1 mr-3 flex-shrink-0"></i>
+                            <span>Wernicke失语症对话模拟</span>
+                        </li>
+                        <li class="flex items-start min-h-[40px] py-1">
+                            <i class="fa fa-check-circle text-secondary mt-1 mr-3 flex-shrink-0"></i>
+                            <span>大脑语言区域交互式展示</span>
+                        </li>
+                    </ul>
+                </div>
+
+                <!-- 目标用户卡片 -->
+                <div class="scroll-trigger bg-light rounded-2xl p-8 shadow-lg hover:shadow-xl transition-shadow bento-card">
+                    <div class="w-16 h-16 bg-accent/10 rounded-full flex items-center justify-center mb-6">
+                        <i class="fa fa-users text-accent text-2xl"></i>
+                    </div>
+                    <h3 class="text-xl font-bold mb-4 text-dark">目标用户</h3>
+                    <ul class="text-gray-700"> <!-- 已移除space-y-3 -->
+                        <li class="flex items-start min-h-[40px] py-1">
+                            <i class="fa fa-check-circle text-accent mt-1 mr-3 flex-shrink-0"></i>
+                            <span>医学院学生和研究人员</span>
+                        </li>
+                        <li class="flex items-start min-h-[40px] py-1">
+                            <i class="fa fa-check-circle text-accent mt-1 mr-3 flex-shrink-0"></i>
+                            <span>神经科医生和语言治疗师</span>
+                        </li>
+                        <li class="flex items-start min-h-[40px] py-1">
+                            <i class="fa fa-check-circle text-accent mt-1 mr-3 flex-shrink-0"></i>
+                            <span>脑科学爱好者和公众</span>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- 失语症类型 -->
+    <section id="aphasia-types" class="py-20 bg-gray-50">
+        <div class="container mx-auto px-4">
+            <div class="scroll-trigger text-center mb-16">
+                <h2 class="text-[clamp(1.8rem,3vw,2.5rem)] font-bold mb-4 gradient-text">失语症类型</h2>
+                <div class="w-24 h-1 bg-gradient-to-r from-primary to-secondary mx-auto mb-6 rounded-full"></div>
+                <p class="text-gray-600 max-w-3xl mx-auto">
+                    失语症是由于大脑语言区域受损导致的语言障碍，主要分为表达性和接受性两大类。
+                    我们将详细介绍两种主要类型：Broca失语症和Wernicke失语症。
+                </p>
+            </div>
+
+            <!-- 便当盒网格 - 比较展示 -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <!-- Broca失语症卡片 -->
+                <div class="scroll-trigger bg-white rounded-2xl shadow-lg overflow-hidden hover:shadow-xl transition-shadow bento-card">
+                    <div class="gradient-bg p-6 text-white">
+                        <h3 class="text-2xl font-bold mb-2">Broca失语症</h3>
+                        <p class="text-white/80">运动性失语 / 表达性失语</p>
+                    </div>
+                    <div class="p-8">
+                        <div class="mb-6">
+                            <h4 class="text-lg font-semibold mb-3 text-dark flex items-center">
+                                <i class="fa fa-hospital-o text-primary mr-2"></i>
+                                病因
+                            </h4>
+                            <p class="text-gray-700">
+                                大脑优势半球额下回（布罗卡区）受损，常见于脑卒中、脑外伤或肿瘤。
+                            </p>
+                        </div>
+
+                        <div class="mb-6">
+                            <h4 class="text-lg font-semibold mb-3 text-dark flex items-center">
+                                <i class="fa fa-medkit text-primary mr-2"></i>
+                                主要症状
+                            </h4>
+                            <ul class="text-gray-700"> <!-- 已移除space-y-3 -->
+                                <li class="flex items-start min-h-[36px] py-1">
+                                    <i class="fa fa-angle-right text-primary mt-1 mr-2 flex-shrink-0"></i>
+                                    <span>言语不流畅，说话费力</span>
+                                </li>
+                                <li class="flex items-start min-h-[36px] py-1">
+                                    <i class="fa fa-angle-right text-primary mt-1 mr-2 flex-shrink-0"></i>
+                                    <span>理解能力相对保留</span>
+                                </li>
+                                <li class="flex items-start min-h-[36px] py-1">
+                                    <i class="fa fa-angle-right text-primary mt-1 mr-2 flex-shrink-0"></i>
+                                    <span>语法缺失，电报式语言</span>
+                                </li>
+                                <li class="flex items-start min-h-[36px] py-1">
+                                    <i class="fa fa-angle-right text-primary mt-1 mr-2 flex-shrink-0"></i>
+                                    <span>轻度阅读和书写障碍</span>
+                                </li>
+                            </ul>
+                        </div>
+
+                        <div>
+                            <h4 class="text-lg font-semibold mb-3 text-dark flex items-center">
+                                <i class="fa fa-comments-o text-primary mr-2"></i>
+                                语言特点
+                            </h4>
+                            <blockquote class="border-l-4 border-primary pl-4 italic text-gray-600">
+                                "... 是 ... 医院 ... 昨天 ... 头痛 ... 医生 ..."
+                                <footer class="text-sm mt-2">典型的电报式表达</footer>
+                            </blockquote>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Wernicke失语症卡片 -->
+                <div class="scroll-trigger bg-white rounded-2xl shadow-lg overflow-hidden hover:shadow-xl transition-shadow bento-card">
+                    <div class="gradient-bg p-6 text-white">
+                        <h3 class="text-2xl font-bold mb-2">Wernicke失语症</h3>
+                        <p class="text-white/80">感觉性失语 / 接受性失语</p>
+                    </div>
+                    <div class="p-8">
+                        <div class="mb-6">
+                            <h4 class="text-lg font-semibold mb-3 text-dark flex items-center">
+                                <i class="fa fa-hospital-o text-secondary mr-2"></i>
+                                病因
+                            </h4>
+                            <p class="text-gray-700">
+                                大脑优势半球颞上回（韦尼克区）受损，常见于脑卒中、脑外伤或肿瘤。
+                            </p>
+                        </div>
+
+                        <div class="mb-6">
+                            <h4 class="text-lg font-semibold mb-3 text-dark flex items-center">
+                                <i class="fa fa-medkit text-secondary mr-2"></i>
+                                主要症状
+                            </h4>
+                            <ul class="text-gray-700"> <!-- 已移除space-y-3 -->
+                                <li class="flex items-start min-h-[36px] py-1">
+                                    <i class="fa fa-angle-right text-secondary mt-1 mr-2 flex-shrink-0"></i>
+                                    <span>言语流畅但内容空洞</span>
+                                </li>
+                                <li class="flex items-start min-h-[36px] py-1">
+                                    <i class="fa fa-angle-right text-secondary mt-1 mr-2 flex-shrink-0"></i>
+                                    <span>理解能力严重受损</span>
+                                </li>
+                                <li class="flex items-start min-h-[36px] py-1">
+                                    <i class="fa fa-angle-right text-secondary mt-1 mr-2 flex-shrink-0"></i>
+                                    <span>语法正确但意义不连贯</span>
+                                </li>
+                                <li class="flex items-start min-h-[36px] py-1">
+                                    <i class="fa fa-angle-right text-secondary mt-1 mr-2 flex-shrink-0"></i>
+                                    <span>明显的阅读和书写障碍</span>
+                                </li>
+                            </ul>
+                        </div>
+
+                        <div>
+                            <h4 class="text-lg font-semibold mb-3 text-dark flex items-center">
+                                <i class="fa fa-comments-o text-secondary mr-2"></i>
+                                语言特点
+                            </h4>
+                            <blockquote class="border-l-4 border-secondary pl-4 italic text-gray-600">
+                                "我那个‘电光机’昨天在‘云桌子’上不‘旋钮’了，我就用‘饭盒子’敲了它几下。"
+                                <footer class="text-sm mt-2">流畅但内容空洞、意义不连贯</footer>
+                            </blockquote>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 比较表格 -->
+            <div class="scroll-trigger mt-16 bg-white rounded-2xl shadow-lg p-8">
+                <h3 class="text-xl font-bold mb-6 text-center text-dark">失语症比较</h3>
+                <div class="overflow-x-auto">
+                    <table class="w-full min-w-[600px]">
+                        <thead>
+                            <tr class="border-b border-gray-200">
+                                <th class="py-3 px-4 text-left font-semibold text-gray-700">特征</th>
+                                <th class="py-3 px-4 text-left font-semibold text-primary">Broca失语症</th>
+                                <th class="py-3 px-4 text-left font-semibold text-secondary">Wernicke失语症</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr class="border-b border-gray-100 hover:bg-gray-50">
+                                <td class="py-3 px-4 font-medium">受损脑区</td>
+                                <td class="py-3 px-4">布罗卡区（额下回）</td>
+                                <td class="py-3 px-4">韦尼克区（颞上回）</td>
+                            </tr>
+                            <tr class="border-b border-gray-100 hover:bg-gray-50">
+                                <td class="py-3 px-4 font-medium">言语流畅性</td>
+                                <td class="py-3 px-4">非流畅</td>
+                                <td class="py-3 px-4">流畅</td>
+                            </tr>
+                            <tr class="border-b border-gray-100 hover:bg-gray-50">
+                                <td class="py-3 px-4 font-medium">语言理解</td>
+                                <td class="py-3 px-4">相对保留</td>
+                                <td class="py-3 px-4">严重受损</td>
+                            </tr>
+                            <tr class="border-b border-gray-100 hover:bg-gray-50">
+                                <td class="py-3 px-4 font-medium">阅读障碍</td>
+                                <td class="py-3 px-4">轻度</td>
+                                <td class="py-3 px-4">明显</td>
+                            </tr>
+                            <tr class="hover:bg-gray-50">
+                                <td class="py-3 px-4 font-medium">对自身障碍的意识</td>
+                                <td class="py-3 px-4">较强</td>
+                                <td class="py-3 px-4">较弱</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </section>
+    <!-- 大脑语言区域 -->
+<section id="brain-areas" class="py-20 bg-white">
+    <div class="container mx-auto px-4">
+        <div class="scroll-trigger text-center mb-16">
+            <h2 class="text-[clamp(1.8rem,3vw,2.5rem)] font-bold mb-4 gradient-text">大脑语言区域</h2>
+            <div class="w-24 h-1 bg-gradient-to-r from-primary to-secondary mx-auto mb-6 rounded-full"></div>
+            <p class="text-gray-600 max-w-3xl mx-auto">
+                人类的语言功能主要由大脑左半球的特定区域控制。除了核心的布罗卡区（Broca's area）和韦尼克区（Wernicke's area）外，
+                还涉及运动皮层、角形脑回、缘上回等多个区域，它们围绕大脑外侧裂（Sylvian fissure）共同构成了一个复杂的语言处理网络。
+            </p>
+        </div>
+
+        <div class="p-6 max-w-5xl w-full mx-auto">
+            <!-- 视频按钮区域 -->
+            <div class="text-center mb-12">
+                <h4 class="text-lg font-semibold text-gray-800 mb-2">视频资源导航</h4>
+                <p class="text-sm text-gray-600 mb-8 max-w-2xl mx-auto">
+                    点击下方按钮，在Bilibili观看专业的神经科学动画视频，深入了解大脑语言中枢的工作原理和失语症机制。
+                </p>
+
+                <!-- 双按钮设计 -->
+                <div class="flex flex-col md:flex-row justify-center gap-6 md:gap-10 items-center">
+                    <!-- 科普动画按钮 -->
+                    <a href="https://www.bilibili.com/video/BV1x44y1E7Nu"
+                       target="_blank"
+                       class="group relative overflow-hidden w-full md:w-auto min-w-[280px] bg-gradient-to-br from-primary via-primary to-secondary text-white rounded-2xl p-6 shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1">
+                        <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-accent to-white opacity-80"></div>
+
+                        <div class="flex flex-col items-center text-center">
+                            <!-- 图标和标题 -->
+                            <div class="flex items-center justify-center w-16 h-16 bg-white/20 rounded-full mb-4 group-hover:scale-110 transition-transform duration-300">
+                                <i class="fa fa-link text-white text-2xl"></i>
+                            </div>
+
+                            <h5 class="text-xl font-bold mb-2">布洛卡失语症</h5>
+                            <p class="text-white/90 text-sm mb-4">
+                                布洛卡失语症科普视频
+                            </p>
+
+                            <!-- 按钮内容 -->
+                            <div class="flex items-center justify-center gap-2 text-white/80 text-sm">
+                                <i class="fa fa-external-link"></i>
+                                <span>点击前往Bilibili观看</span>
+                            </div>
+
+                            <!-- 悬浮特效 -->
+                            <div class="absolute -bottom-10 -right-10 w-20 h-20 bg-white/10 rounded-full group-hover:scale-150 transition-transform duration-500"></div>
+                            <div class="absolute -top-10 -left-10 w-16 h-16 bg-white/5 rounded-full group-hover:scale-125 transition-transform duration-700"></div>
+                        </div>
+                    </a>
+
+                    <!-- 科普动画按钮 -->
+                    <a href="https://www.bilibili.com/video/BV1N44y1J735"
+                       target="_blank"
+                       class="group relative overflow-hidden w-full md:w-auto min-w-[280px] bg-gradient-to-br from-secondary via-secondary to-accent text-white rounded-2xl p-6 shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1">
+                        <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-white to-accent opacity-80"></div>
+
+                        <div class="flex flex-col items-center text-center">
+                            <!-- 图标和标题 -->
+                            <div class="flex items-center justify-center w-16 h-16 bg-white/20 rounded-full mb-4 group-hover:scale-110 transition-transform duration-300">
+                                <i class="fa fa-graduation-cap text-white text-2xl"></i>
+                            </div>
+
+                            <h5 class="text-xl font-bold mb-2">维尼克失语症</h5>
+                            <p class="text-white/90 text-sm mb-4">
+                                维尼克失语症科普视频
+                            </p>
+
+                            <!-- 按钮内容 -->
+                            <div class="flex items-center justify-center gap-2 text-white/80 text-sm">
+                                <i class="fa fa-external-link"></i>
+                                <span>点击前往Bilibili观看</span>
+                            </div>
+
+                            <!-- 悬浮特效 -->
+                            <div class="absolute -bottom-10 -left-10 w-20 h-20 bg-white/10 rounded-full group-hover:scale-150 transition-transform duration-500"></div>
+                            <div class="absolute -top-10 -right-10 w-16 h-16 bg-white/5 rounded-full group-hover:scale-125 transition-transform duration-700"></div>
+                        </div>
+                    </a>
+                </div>
+
+                <!-- 分隔线 -->
+                <div class="relative my-12">
+                    <div class="absolute inset-0 flex items-center">
+                        <div class="w-full border-t border-gray-200"></div>
+                    </div>
+                    <div class="relative flex justify-center text-sm">
+                        <span class="px-4 bg-white text-gray-500">对比查看：大脑语言中枢解剖定位</span>
+                    </div>
+                </div>
+            </div>
+
+
+
+
+                       
+                        <!-- 大脑图像容器 -->
+<div class="brain-image-container mx-auto mb-8 relative">
+    <!-- 加载占位符 -->
+    <div id="brain-loading" class="absolute inset-0 flex items-center justify-center bg-gray-100 animate-pulse rounded-lg">
+        <div class="text-center">
+            <i class="fa fa-spinner fa-spin text-3xl text-primary mb-3"></i>
+            <p class="text-gray-500">正在加载大脑示意图...</p>
+        </div>
+    </div>
+
+    <!-- 原图片 -->
+    <img src="https://github.com/miaoye183/brain-images/blob/main/1767081162253-580p34700tm.png?raw=true"
+         alt="大脑语言中枢解剖图：显示左半球的语言处理网络，包括布洛卡区（Broca's area）、韦尼克区（Wernicke's area）、运动皮层、角形脑回（Angular gyrus）和缘上回等关键区域"
+         class="brain-image opacity-0 transition-opacity duration-300"
+         id="brain-static"
+         loading="eager"
+         crossorigin="anonymous"
+         onload="document.getElementById('brain-loading').style.display='none'; this.classList.remove('opacity-0')"
+         onerror="this.onerror=null; this.src='imgs/1767081162253-580p34700tm.png';">
+
+    <!-- 标注层 (由于新图片已包含详细标签，暂时隐藏CSS标注层以避免视觉冲突) -->
+    <div style="display: none;">
+        <div class="broca-highlight brain-area-highlight" id="broca-highlight"></div>
+        <div class="wernicke-highlight brain-area-highlight" id="wernicke-highlight"></div>
+        <div class="broca-line annotation-line"></div>
+        <div class="wernicke-line annotation-line"></div>
+
+        <div class="broca-annotation brain-annotation">
+            <div class="flex items-center gap-1">
+                <div class="w-3 h-3 rounded-full bg-red-500"></div>
+                <span>布洛卡区</span>
+            </div>
+            <div class="text-xs mt-1 text-gray-600">语言表达中枢</div>
+        </div>
+
+        <div class="wernicke-annotation brain-annotation">
+            <div class="flex items-center gap-1">
+                <div class="w-3 h-3 rounded-full bg-blue-500"></div>
+                <span>威尔尼克区</span>
+            </div>
+            <div class="text-xs mt-1 text-gray-600">语言理解中枢</div>
+        </div>
+    </div>
+
+    <div class="zoom-level" id="zoom-level">静态视图</div>
+</div>
+
+                            <!-- 静态图的缩放控制 -->
+                            <div class="controls flex justify-center gap-3 mb-8">
+                                <button id="zoomIn" class="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors">
+                                    <i class="fa fa-search-plus"></i> 放大
+                                </button>
+                                <button id="zoomOut" class="px-4 py-2 bg-secondary text-white rounded-lg hover:bg-secondary/90 transition-colors">
+                                    <i class="fa fa-search-minus"></i> 缩小
+                                </button>
+                                <button id="reset" class="px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400 transition-colors">
+                                    <i class="fa fa-refresh"></i> 重置
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-8 pt-8 border-t border-gray-100">
+                        <!-- 布洛卡区信息卡片 -->
+                        <div class="bg-white rounded-xl p-6 shadow-md hover:shadow-lg transition-shadow border border-gray-100">
+                            <div class="flex items-center gap-3 mb-4">
+                                <div class="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center">
+                                    <i class="fa fa-comment text-red-500"></i>
+                                </div>
+                                <div>
+                                    <h4 class="text-lg font-bold text-gray-800">布洛卡区 (Broca's Area)</h4>
+                                    <p class="text-sm text-gray-500">语言表达中枢</p>
+                                </div>
+                            </div>
+                            <ul class="text-gray-700"> <!-- 已移除space-y-3 -->
+                                <li class="flex items-start min-h-[44px] py-2">
+                                    <i class="fa fa-map-marker text-red-500 mt-1 mr-3 flex-shrink-0"></i>
+                                    <span><strong>位置：</strong>左脑额叶，额下回后部（Inferior frontal cortex）</span>
+                                </li>
+                                <li class="flex items-start min-h-[44px] py-2">
+                                    <i class="fa fa-cog text-red-500 mt-1 mr-3 flex-shrink-0"></i>
+                                    <span><strong>功能：</strong>负责语言产生、语法处理和运动规划</span>
+                                </li>
+                            </ul>
+                        </div>
+
+                        <!-- 韦尼克区信息卡片 -->
+                        <div class="bg-white rounded-xl p-6 shadow-md hover:shadow-lg transition-shadow border border-gray-100">
+                            <div class="flex items-center gap-3 mb-4">
+                                <div class="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
+                                    <i class="fa fa-headphones text-blue-500"></i>
+                                </div>
+                                <div>
+                                    <h4 class="text-lg font-bold text-gray-800">韦尼克区 (Wernicke's Area)</h4>
+                                    <p class="text-sm text-gray-500">语言理解中枢</p>
+                                </div>
+                            </div>
+                            <ul class="text-gray-700"> <!-- 已移除space-y-3 -->
+                                <li class="flex items-start min-h-[44px] py-2">
+                                    <i class="fa fa-map-marker text-blue-500 mt-1 mr-3 flex-shrink-0"></i>
+                                    <span><strong>位置：</strong>左脑颞叶，颞上回后部（Superior temporal gyrus）</span>
+                                </li>
+                                <li class="flex items-start min-h-[44px] py-2">
+                                    <i class="fa fa-cog text-blue-500 mt-1 mr-3 flex-shrink-0"></i>
+                                    <span><strong>功能：</strong>负责语言理解、语义处理和听觉整合</span>
+                                </li>
+                            </ul>
+                        </div>
+
+                        <!-- 运动皮层信息卡片 -->
+                        <div class="bg-white rounded-xl p-6 shadow-md hover:shadow-lg transition-shadow border border-gray-100">
+                            <div class="flex items-center gap-3 mb-4">
+                                <div class="w-10 h-10 rounded-full bg-orange-100 flex items-center justify-center">
+                                    <i class="fa fa-bolt text-orange-500"></i>
+                                </div>
+                                <div>
+                                    <h4 class="text-lg font-bold text-gray-800">运动皮层 (Motor Cortex)</h4>
+                                    <p class="text-sm text-gray-500">肌肉运动控制</p>
+                                </div>
+                            </div>
+                            <ul class="text-gray-700">
+                                <li class="flex items-start min-h-[44px] py-2">
+                                    <i class="fa fa-map-marker text-orange-500 mt-1 mr-3 flex-shrink-0"></i>
+                                    <span><strong>位置：</strong>额叶后部，中央前回</span>
+                                </li>
+                                <li class="flex items-start min-h-[44px] py-2">
+                                    <i class="fa fa-cog text-orange-500 mt-1 mr-3 flex-shrink-0"></i>
+                                    <span><strong>功能：</strong>控制发音器官（舌、唇、喉）的肌肉运动</span>
+                                </li>
+                            </ul>
+                        </div>
+
+                        <!-- 角形脑回信息卡片 -->
+                        <div class="bg-white rounded-xl p-6 shadow-md hover:shadow-lg transition-shadow border border-gray-100">
+                            <div class="flex items-center gap-3 mb-4">
+                                <div class="w-10 h-10 rounded-full bg-purple-100 flex items-center justify-center">
+                                    <i class="fa fa-book text-purple-500"></i>
+                                </div>
+                                <div>
+                                    <h4 class="text-lg font-bold text-gray-800">角形脑回 (Angular Gyrus)</h4>
+                                    <p class="text-sm text-gray-500">视觉语言整合</p>
+                                </div>
+                            </div>
+                            <ul class="text-gray-700">
+                                <li class="flex items-start min-h-[44px] py-2">
+                                    <i class="fa fa-map-marker text-purple-500 mt-1 mr-3 flex-shrink-0"></i>
+                                    <span><strong>位置：</strong>顶叶下部（Inferior parietal lobule）</span>
+                                </li>
+                                <li class="flex items-start min-h-[44px] py-2">
+                                    <i class="fa fa-cog text-purple-500 mt-1 mr-3 flex-shrink-0"></i>
+                                    <span><strong>功能：</strong>处理书面语言，将视觉信息转化为语言形式（阅读与写作）</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+              </div>
+
+            <!-- 语言区域功能图表 -->
+            <div class="scroll-trigger mt-12 bg-white rounded-2xl shadow-lg p-6">
+                <h3 class="text-xl font-bold mb-6 text-center text-dark">语言处理流程</h3>
+                <div class="relative py-8">
+                    <!-- 流程线 -->
+                    <div class="absolute left-0 md:left-1/2 top-1/2 transform -translate-y-1/2 h-1 w-full md:w-auto bg-gradient-to-r from-primary to-secondary"></div>
+
+                    <!-- 流程步骤 -->
+                    <div class="relative z-10 flex flex-col md:flex-row justify-between items-center gap-8">
+                        <div class="bg-light rounded-full p-6 shadow text-center w-48 h-48 flex flex-col items-center justify-center">
+                            <i class="fa fa-headphones text-primary text-4xl mb-3"></i>
+                            <h4 class="font-bold">听觉输入</h4>
+                            <p class="text-sm mt-2 text-gray-600">声音信号传入大脑</p>
+                        </div>
+
+                        <div class="bg-light rounded-full p-6 shadow text-center w-48 h-48 flex flex-col items-center justify-center">
+                            <i class="fa fa-cog text-secondary text-4xl mb-3"></i>
+                            <h4 class="font-bold">韦尼克区</h4>
+                            <p class="text-sm mt-2 text-gray-600">处理和理解语义</p>
+                        </div>
+
+                        <div class="bg-light rounded-full p-6 shadow text-center w-48 h-48 flex flex-col items-center justify-center">
+                            <i class="fa fa-exchange text-accent text-4xl mb-3"></i>
+                            <h4 class="font-bold">弓状束</h4>
+                            <p class="text-sm mt-2 text-gray-600">信息传递通道</p>
+                        </div>
+
+                        <div class="bg-light rounded-full p-6 shadow text-center w-48 h-48 flex flex-col items-center justify-center">
+                            <i class="fa fa-comment text-primary text-4xl mb-3"></i>
+                            <h4 class="font-bold">布罗卡区</h4>
+                            <p class="text-sm mt-2 text-gray-600">生成语言表达</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+         </section>
+
+    <!-- 对话模拟 -->
+    <section id="simulation" class="py-20 bg-gray-50">
+        <div class="container mx-auto px-4">
+            <div class="scroll-trigger text-center mb-16">
+                <h2 class="text-[clamp(1.8rem,3vw,2.5rem)] font-bold mb-4 gradient-text">交互式对话模拟</h2>
+                <div class="w-24 h-1 bg-gradient-to-r from-primary to-secondary mx-auto mb-6 rounded-full"></div>
+                <p class="text-gray-600 max-w-3xl mx-auto">
+                    体验与模拟的失语症患者对话，感受不同类型失语症的语言特点。
+                    选择对话类型，输入问题，观察不同的语言回应模式。
+                </p>
+            </div>
+
+            <!-- 便当盒网格布局 -->
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                <!-- 模拟控制面板 -->
+                <div class="scroll-trigger bg-white rounded-2xl shadow-lg p-6 hover:shadow-xl transition-shadow">
+                    <h3 class="text-xl font-bold mb-6 text-dark">模拟控制</h3>
+
+                    <!-- 选择失语症类型 -->
+                    <div class="mb-6">
+                        <label class="block text-gray-700 font-medium mb-2">选择失语症类型</label>
+                        <select id="aphasia-type" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary transition-all">
+                            <option value="broca">Broca失语症（表达性）</option>
+                            <option value="wernicke" selected>Wernicke失语症（接受性）</option>
+                        </select>
+                    </div>
+
+                    <!-- Wernicke失语症混乱度控制 -->
+                    <div id="wernicke-controls" class="mb-6">
+                        <div class="flex justify-between items-center mb-3">
+                            <label class="block text-gray-700 font-medium">Wernicke混乱程度</label>
+                            <span id="confusion-level-value" class="text-sm font-bold text-secondary">中等 (7)</span>
+                        </div>
+                        <input type="range" id="confusion-level" min="1" max="10" step="1" value="7"
+                               class="confusion-slider w-full">
+                        <div class="flex justify-between text-xs text-gray-500 mt-2">
+                            <span>轻微</span>
+                            <span>中等</span>
+                            <span>重度</span>
+                            <span>极重度</span>
+                        </div>
+
+                        <!-- Wernicke特征调节 -->
+                        <div class="mt-6 space-y-4">
+                            <div>
+                                <div class="flex justify-between items-center mb-1">
+                                    <span class="text-sm text-gray-600">新语比例</span>
+                                    <span id="neologism-percent" class="text-xs font-medium text-amber-600">70%</span>
+                                </div>
+                                <input type="range" id="neologism-slider" min="0" max="100" value="70"
+                                       class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
+                            </div>
+
+                            <div>
+                                <div class="flex justify-between items-center mb-1">
+                                    <span class="text-sm text-gray-600">错语密度</span>
+                                    <span id="paraphasia-percent" class="text-xs font-medium text-indigo-600">60%</span>
+                                </div>
+                                <input type="range" id="paraphasia-slider" min="0" max="100" value="60"
+                                       class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
+                            </div>
+
+                            <div>
+                                <div class="flex justify-between items-center mb-1">
+                                    <span class="text-sm text-gray-600">语词沙拉程度</span>
+                                    <span id="salad-percent" class="text-xs font-medium text-purple-600">40%</span>
+                                </div>
+                                <input type="range" id="salad-slider" min="0" max="100" value="40"
+                                       class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 输入问题 -->
+                    <div class="mb-6">
+                        <label class="block text-gray-700 font-medium mb-2">输入您的问题</label>
+                        <textarea id="user-question" rows="4" placeholder="请输入您想询问的问题..." class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary transition-all"></textarea>
+                    </div>
+
+                    <!-- 语音控制区域 -->
+                    <div class="mb-6">
+                        <label class="block text-gray-700 font-medium mb-2">语音交互控制</label>
+                        <div class="grid grid-cols-2 gap-3">
+                            <!-- 语音输入按钮 -->
+                            <button id="voice-input-btn" class="py-3 px-4 bg-secondary text-white font-semibold rounded-lg hover:bg-secondary/90 transition-colors shadow flex items-center justify-center gap-2">
+                                <i class="fa fa-microphone"></i>
+                                <span>语音输入</span>
+                            </button>
+                            <!-- 语音输出按钮 -->
+                            <button id="voice-output-btn" class="py-3 px-4 bg-accent text-white font-semibold rounded-lg hover:bg-accent/90 transition-colors shadow flex items-center justify-center gap-2">
+                                <i class="fa fa-volume-up"></i>
+                                <span>语音播放</span>
+                            </button>
+                        </div>
+
+                        <!-- 语音状态指示器 -->
+                        <div id="voice-status" class="mt-3 text-sm">
+                            <div class="flex items-center gap-2">
+                                <div id="voice-indicator" class="voice-indicator ready"></div>
+                                <span id="voice-status-text">语音交互准备就绪</span>
+                            </div>
+                        </div>
+
+                        <!-- 语音设置面板 -->
+                        <div id="voice-settings" class="mt-4 p-4 bg-gray-50 rounded-lg border border-gray-200 hidden">
+                            <h4 class="font-medium text-gray-700 mb-3">语音设置</h4>
+
+                            <!-- 语速设置 -->
+                            <div class="mb-4">
+                                <label class="block text-sm text-gray-600 mb-2">语速 (0.5-2.0倍)</label>
+                                <div class="flex items-center gap-3">
+                                    <span class="text-xs text-gray-500">慢</span>
+                                    <input type="range" id="speech-rate" min="0.5" max="2" step="0.1" value="1" class="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
+                                    <span class="text-xs text-gray-500">快</span>
+                                </div>
+                                <div class="text-xs text-gray-500 mt-1 text-center">
+                                    <span id="rate-value">1.0x</span>
+                                </div>
+                            </div>
+
+                            <!-- 音量设置 -->
+                            <div class="mb-4">
+                                <label class="block text-sm text-gray-600 mb-2">音量 (0-100%)</label>
+                                <div class="flex items-center gap-3">
+                                    <span class="text-xs text-gray-500">小</span>
+                                    <input type="range" id="speech-volume" min="0" max="1" step="0.1" value="0.8" class="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
+                                    <span class="text-xs text-gray-500">大</span>
+                                </div>
+                                <div class="text-xs text-gray-500 mt-1 text-center">
+                                    <span id="volume-value">80%</span>
+                                </div>
+                            </div>
+
+                            <!-- 音调设置 -->
+                            <div class="mb-4">
+                                <label class="block text-sm text-gray-600 mb-2">音调 (0.5-2.0)</label>
+                                <div class="flex items-center gap-3">
+                                    <span class="text-xs text-gray-500">低</span>
+                                    <input type="range" id="speech-pitch" min="0.5" max="2" step="0.1" value="1" class="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
+                                    <span class="text-xs text-gray-500">高</span>
+                                </div>
+                                <div class="text-xs text-gray-500 mt-1 text-center">
+                                    <span id="pitch-value">1.0</span>
+                                </div>
+                            </div>
+
+                            <!-- 设置按钮 -->
+                            <div class="flex gap-2">
+                                <button id="apply-settings" class="flex-1 py-2 px-4 bg-primary text-white text-sm rounded-lg hover:bg-primary/90 transition-colors">
+                                    应用设置
+                                </button>
+                                <button id="reset-settings" class="flex-1 py-2 px-4 bg-gray-300 text-gray-700 text-sm rounded-lg hover:bg-gray-400 transition-colors">
+                                    重置
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- 设置切换按钮 -->
+                        <button id="toggle-settings" class="mt-2 text-sm text-primary hover:text-primary/80 flex items-center gap-1">
+                            <i class="fa fa-cog"></i>
+                            <span>语音设置</span>
+                            <i class="fa fa-chevron-down text-xs"></i>
+                        </button>
+                    </div>
+
+                    <!-- 发送按钮 -->
+                    <button id="send-question" class="w-full py-3 px-6 bg-primary text-white font-semibold rounded-lg hover:bg-primary/90 transition-colors shadow flex items-center justify-center gap-2">
+                        <i class="fa fa-paper-plane"></i>
+                        <span>发送问题</span>
+                    </button>
+
+                    <!-- 常见问题 -->
+                    <div class="mt-8">
+                        <h4 class="font-medium text-gray-700 mb-3">预设问题：</h4>
+                        <div class="grid grid-cols-1 gap-2">
+                            <button class="sample-question text-left p-2 text-sm bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors" data-question="你今天感觉怎么样？">
+                                • 你今天感觉怎么样？
+                            </button>
+                            <button class="sample-question text-left p-2 text-sm bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors" data-question="你能告诉我你的名字吗？">
+                                • 你能告诉我你的名字吗？
+                            </button>
+                            <button class="sample-question text-left p-2 text-sm bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors" data-question="你今天去了哪里？">
+                                • 你今天去了哪里？
+                            </button>
+                            <button class="sample-question text-left p-2 text-sm bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors" data-question="你记得昨天发生了什么吗？">
+                                • 你记得昨天发生了什么吗？
+                            </button>
+                            <button class="sample-question text-left p-2 text-sm bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors" data-question="你住在哪里？">
+                                • 你住在哪里？
+                            </button>
+                            <button class="sample-question text-left p-2 text-sm bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors" data-question="你需要帮助吗？">
+                                • 你需要帮助吗？
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 对话界面 -->
+                <div class="scroll-trigger lg:col-span-2 bg-white rounded-2xl shadow-lg overflow-hidden hover:shadow-xl transition-shadow flex flex-col">
+                    <div class="p-4 bg-light border-b border-gray-100 flex justify-between items-center">
+                        <h3 class="text-xl font-bold text-dark">对话模拟</h3>
+                        <div id="current-mode" class="px-3 py-1 bg-secondary/10 text-secondary text-sm rounded-full">
+                            当前模式：Wernicke失语症
+                        </div>
+                    </div>
+
+                    <div id="conversation-container" class="flex-1 p-6 overflow-y-auto scrollbar-hide space-y-6 min-h-[500px] max-h-[600px]">
+                        <!-- 欢迎消息 -->
+                        <div class="flex items-start gap-4">
+                            <div class="w-10 h-10 bg-secondary/10 rounded-full flex items-center justify-center flex-shrink-0">
+                                <i class="fa fa-user-md text-secondary"></i>
+                            </div>
+                            <div class="wernicke-message max-w-[80%] rounded-2xl rounded-tl-none">
+                                <p class="text-gray-700">
+                                    你好你好！今天那个……太阳和月亮一起转，我们要去绿色的桌子上开会。（紧接着开始一段空洞、错乱的独白）
+                                    <span class="confusion-indicator">混乱度: 7</span>
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 对话状态信息 -->
+                    <div class="p-4 bg-gray-50 border-t border-gray-100 text-sm text-gray-500">
+                        <div class="flex justify-between items-center">
+                            <p>提示：这是一个模拟系统，用于教育目的。真实的失语症表现因个体差异而异。</p>
+                            <div id="conversation-stats" class="text-xs">
+                                新语: <span id="neologism-count" class="font-medium">2</span> |
+                                错语: <span id="paraphasia-count" class="font-medium">3</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- 参考文献 -->
+    <section id="references" class="py-20 bg-white">
+        <div class="container mx-auto px-4">
+            <div class="scroll-trigger text-center mb-16">
+                <h2 class="text-[clamp(1.8rem,3vw,2.5rem)] font-bold mb-4 gradient-text">参考文献与资源</h2>
+                <div class="w-24 h-1 bg-gradient-to-r from-primary to-secondary mx-auto mb-6 rounded-full"></div>
+                <p class="text-gray-600 max-w-3xl mx-auto">
+                    本项目基于权威医学资源和研究成果，以下是部分参考资料和相关资源链接。
+                </p>
+            </div>
+
+            <!-- 便当盒网格布局 -->
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                <!-- 医学参考资源 -->
+                <div class="scroll-trigger bg-light rounded-2xl p-6 shadow-lg hover:shadow-xl transition-shadow">
+                    <div class="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center mb-6">
+                        <i class="fa fa-medkit text-primary text-xl"></i>
+                    </div>
+                    <h3 class="text-lg font-bold mb-4 text-dark">医学参考资源</h3>
+                    <ul class="text-gray-700"> <!-- 已移除space-y-3 -->
+                        <li class="flex items-start min-h-[36px] py-1">
+                            <a href="https://guide.medlive.cn/" target="_blank" class="text-primary hover:text-primary/80 flex items-start gap-2 group">
+                                <i class="fa fa-external-link text-xs mt-1 group-hover:translate-x-1 transition-transform flex-shrink-0"></i>
+                                <div>
+                                    <span class="font-medium">神经病学专业指南 - 失语症诊断标准</span>
+                                    <p class="text-xs text-gray-500 mt-0.5">医脉通临床指南库，收录权威机构发布的最新神经病学与失语症诊断标准。</p>
+                                </div>
+                            </a>
+                        </li>
+                        <li class="flex items-start min-h-[36px] py-1">
+                            <a href="https://cmab.yiigle.com/uploads/guide_html/%E4%B8%AD%E5%9B%BD%E8%84%91%E5%8D%92%E4%B8%AD%E6%97%A9%E6%9C%9F%E5%BA%B7%E5%A4%8D%E6%B2%BB%E7%96%97%E6%8C%87%E5%8D%97.html" target="_blank" class="text-primary hover:text-primary/80 flex items-start gap-2 group">
+                                <i class="fa fa-external-link text-xs mt-1 group-hover:translate-x-1 transition-transform flex-shrink-0"></i>
+                                <div>
+                                    <span class="font-medium">脑血管病后失语症康复治疗规范</span>
+                                    <p class="text-xs text-gray-500 mt-0.5">中华医学会发布的脑卒中早期康复治疗指南，包含详细的语言康复规范。</p>
+                                </div>
+                            </a>
+                        </li>
+                        <li class="flex items-start min-h-[36px] py-1">
+                            <a href="http://www.jcyipong.com/medicineDocDetail.action?docID=1265" target="_blank" class="text-primary hover:text-primary/80 flex items-start gap-2 group">
+                                <i class="fa fa-external-link text-xs mt-1 group-hover:translate-x-1 transition-transform flex-shrink-0"></i>
+                                <div>
+                                    <span class="font-medium">脑损伤语言功能评估量表</span>
+                                    <p class="text-xs text-gray-500 mt-0.5">汉语失语成套测验(ABC)等标准化评估工具的操作手册与应用说明。</p>
+                                </div>
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+
+                <!-- 神经科学资源 -->
+                <div class="scroll-trigger bg-light rounded-2xl p-6 shadow-lg hover:shadow-xl transition-shadow">
+                    <div class="w-12 h-12 bg-secondary/10 rounded-full flex items-center justify-center mb-6">
+                        <i class="fa fa-brain text-secondary text-xl"></i>
+                    </div>
+                    <h3 class="text-lg font-bold mb-4 text-dark">神经科学资源</h3>
+                    <ul class="text-gray-700"> <!-- 已移除space-y-3 -->
+                        <li class="flex items-start min-h-[36px] py-1">
+                            <a href="https://www.thehumanbrain.info/" target="_blank" class="text-secondary hover:text-secondary/80 flex items-start gap-2 group">
+                                <i class="fa fa-external-link text-xs mt-1 group-hover:translate-x-1 transition-transform flex-shrink-0"></i>
+                                <div>
+                                    <span class="font-medium">大脑语言区域神经解剖学研究</span>
+                                    <p class="text-xs text-gray-500 mt-0.5">The Human Brain Atlas - 高精度交互式大脑解剖图谱与功能区划。</p>
+                                </div>
+                            </a>
+                        </li>
+                        <li class="flex items-start min-h-[36px] py-1">
+                            <a href="https://www.nature.com/articles/s41597-022-01645-3" target="_blank" class="text-secondary hover:text-secondary/80 flex items-start gap-2 group">
+                                <i class="fa fa-external-link text-xs mt-1 group-hover:translate-x-1 transition-transform flex-shrink-0"></i>
+                                <div>
+                                    <span class="font-medium">功能性磁共振成像(fMRI)语言研究</span>
+                                    <p class="text-xs text-gray-500 mt-0.5">Nature Scientific Data - 基于800+个体fMRI数据的语言网络概率图谱。</p>
+                                </div>
+                            </a>
+                        </li>
+                        <li class="flex items-start min-h-[36px] py-1">
+                            <a href="https://www.ncbi.nlm.nih.gov/books/NBK368474/" target="_blank" class="text-secondary hover:text-secondary/80 flex items-start gap-2 group">
+                                <i class="fa fa-external-link text-xs mt-1 group-hover:translate-x-1 transition-transform flex-shrink-0"></i>
+                                <div>
+                                    <span class="font-medium">FOXP2基因与语言功能研究进展</span>
+                                    <p class="text-xs text-gray-500 mt-0.5">NCBI GeneReviews - FOXP2基因相关言语语言障碍的遗传学与临床综述。</p>
+                                </div>
+                            </a>
+                        </li>
+                        <li class="flex items-start min-h-[36px] py-1">
+                            <a href="https://www.cns.org.cn/" target="_blank" class="text-secondary hover:text-secondary/80 flex items-start gap-2 group">
+                                <i class="fa fa-external-link text-xs mt-1 group-hover:translate-x-1 transition-transform flex-shrink-0"></i>
+                                <div>
+                                    <span class="font-medium">神经科学资源</span>
+                                    <p class="text-xs text-gray-500 mt-0.5">中国神经科学学会 - 涵盖基础神经科学、语言神经机制等核心学术资源。</p>
+                                </div>
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+
+                <!-- 支持与康复资源 -->
+                <div class="scroll-trigger bg-light rounded-2xl p-6 shadow-lg hover:shadow-xl transition-shadow">
+                    <div class="w-12 h-12 bg-accent/10 rounded-full flex items-center justify-center mb-6">
+                        <i class="fa fa-heart text-accent text-xl"></i>
+                    </div>
+                    <h3 class="text-lg font-bold mb-4 text-dark">支持与康复资源</h3>
+                    <ul class="text-gray-700"> <!-- 已移除space-y-3 -->
+                        <li class="flex items-start min-h-[36px] py-1">
+                            <a href="https://www.chinastroke.net/" target="_blank" class="text-accent hover:text-accent/80 flex items-start gap-2 group">
+                                <i class="fa fa-external-link text-xs mt-1 group-hover:translate-x-1 transition-transform flex-shrink-0"></i>
+                                <div>
+                                    <span class="font-medium">失语症患者家属支持指南</span>
+                                    <p class="text-xs text-gray-500 mt-0.5">中国卒中学会(CSA)官方平台 - 包含红手环志愿者服务、患者教育与家庭支持资源。</p>
+                                </div>
+                            </a>
+                        </li>
+                        <li class="flex items-start min-h-[36px] py-1">
+                            <a href="https://www.carm.org.cn/" target="_blank" class="text-accent hover:text-accent/80 flex items-start gap-2 group">
+                                <i class="fa fa-external-link text-xs mt-1 group-hover:translate-x-1 transition-transform flex-shrink-0"></i>
+                                <div>
+                                    <span class="font-medium">语言治疗师专业交流平台</span>
+                                    <p class="text-xs text-gray-500 mt-0.5">中国康复医学会官网 - 及其下属言语康复专业委员会，提供学术会议、继续教育与行业标准。</p>
+                                </div>
+                            </a>
+                        </li>
+                        <li class="flex items-start min-h-[36px] py-1">
+                            <a href="https://www.voibook.com/" target="_blank" class="text-accent hover:text-accent/80 flex items-start gap-2 group">
+                                <i class="fa fa-external-link text-xs mt-1 group-hover:translate-x-1 transition-transform flex-shrink-0"></i>
+                                <div>
+                                    <span class="font-medium">失语症康复训练在线工具</span>
+                                    <p class="text-xs text-gray-500 mt-0.5">音书科技(Yinshu) - 国内领先的听障与失语症辅助沟通APP，提供言语康复训练与字幕服务。</p>
+                                </div>
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- 页脚 -->
+    <footer class="bg-dark text-white py-12">
+        <div class="container mx-auto px-4">
+            <div class="flex flex-col md:flex-row justify-between items-center">
+                <div class="mb-6 md:mb-0">
+                    <div class="flex items-center space-x-2">
+                        <i class="fa fa-brain text-2xl"></i>
+                        <span class="text-xl font-bold">失语症研究平台</span>
+                    </div>
+                    <p class="mt-2 text-gray-400">
+                        探索大脑语言功能，提高公众认知
+                    </p>
+                </div>
+
+                <div class="flex space-x-8">
+                    <a href="#overview" class="text-gray-400 hover:text-white transition-colors">项目概述</a>
+                    <a href="#aphasia-types" class="text-gray-400 hover:text-white transition-colors">失语症类型</a>
+                    <a href="#brain-areas" class="text-gray-400 hover:text-white transition-colors">脑区可视化</a>
+                    <a href="#simulation" class="text-gray-400 hover:text-white transition-colors">对话模拟</a>
+                </div>
+            </div>
+
+            <div class="border-t border-gray-800 mt-8 pt-8 text-center text-gray-400 text-sm">
+                <p>© 2025 失语症研究项目 | 基于权威医学资源开发</p>
+                <p class="mt-2">本平台仅用于教育目的，不能替代专业医疗建议</p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- JavaScript -->
+    <script>
+        // ==================== 语音交互系统 ====================
+        let speechRecognition = null;
+        let speechSynthesis = window.speechSynthesis;
+        let isListening = false;
+        let isSpeaking = false;
+
+        // 初始化语音识别
+        function initializeSpeechRecognition() {
+            if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+                showVoiceError('not-supported');
+                return false;
+            }
+
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            speechRecognition = new SpeechRecognition();
+
+            speechRecognition.continuous = false;
+            speechRecognition.interimResults = true;
+            speechRecognition.lang = 'zh-CN';
+
+            speechRecognition.onstart = function() {
+                isListening = true;
+                updateVoiceUI();
+            };
+
+            speechRecognition.onresult = function(event) {
+                let finalTranscript = '';
+                let interimTranscript = '';
+
+                for (let i = event.resultIndex; i < event.results.length; i++) {
+                    const transcript = event.results[i][0].transcript;
+                    if (event.results[i].isFinal) {
+                        finalTranscript += transcript;
+                    } else {
+                        interimTranscript += transcript;
+                    }
+                }
+
+                const userQuestion = document.getElementById('user-question');
+                if (finalTranscript) {
+                    userQuestion.value = finalTranscript;
+                    // 自动发送问题
+                    setTimeout(() => {
+                        sendQuestion();
+                    }, 500);
+                } else if (interimTranscript) {
+                    userQuestion.value = interimTranscript;
+                }
+            };
+
+            speechRecognition.onerror = function(event) {
+                console.error('语音识别错误:', event.error);
+                isListening = false;
+                updateVoiceUI();
+                showVoiceError(event.error);
+            };
+
+            speechRecognition.onend = function() {
+                isListening = false;
+                updateVoiceUI();
+            };
+
+            return true;
+        }
+
+        // 语音合成
+        function speakText(text, options = {}) {
+            if (!speechSynthesis) {
+                showVoiceError('not-supported');
+                return false;
+            }
+
+            if (isSpeaking) {
+                speechSynthesis.cancel();
+            }
+
+            const utterance = new SpeechSynthesisUtterance(text);
+
+            // 应用语音设置
+            const settings = getVoiceSettings();
+            utterance.rate = options.rate || settings.rate;
+            utterance.pitch = options.pitch || settings.pitch;
+            utterance.volume = options.volume || settings.volume;
+            utterance.lang = 'zh-CN';
+
+            // 尝试设置语音类型（需要浏览器支持）
+            const voices = speechSynthesis.getVoices();
+            if (voices.length > 0) {
+                // 这里可以根据设置的voiceType选择特定语音
+                // 注意：实际语音类型支持取决于浏览器和操作系统
+                utterance.voice = voices[0];
+            }
+
+            utterance.onstart = function() {
+                isSpeaking = true;
+                updateVoiceUI();
+            };
+
+            utterance.onend = function() {
+                isSpeaking = false;
+                updateVoiceUI();
+            };
+
+            utterance.onerror = function(event) {
+                console.error('语音合成错误:', event);
+                isSpeaking = false;
+                updateVoiceUI();
+                showVoiceError('synthesis-error');
+            };
+
+            speechSynthesis.speak(utterance);
+            return true;
+        }
+
+        // 更新语音UI状态
+        function updateVoiceUI() {
+            const voiceIndicator = document.getElementById('voice-indicator');
+            const voiceStatusText = document.getElementById('voice-status-text');
+            const voiceInputBtn = document.getElementById('voice-input-btn');
+            const voiceOutputBtn = document.getElementById('voice-output-btn');
+
+            if (isListening) {
+                voiceIndicator.className = 'voice-indicator listening';
+                voiceStatusText.textContent = '正在聆听...';
+                voiceInputBtn.innerHTML = '<i class="fa fa-microphone-slash"></i><span>停止聆听</span>';
+                voiceInputBtn.classList.add('bg-red-500', 'hover:bg-red-600');
+            } else if (isSpeaking) {
+                voiceIndicator.className = 'voice-indicator speaking';
+                voiceStatusText.textContent = '正在播放语音...';
+                voiceOutputBtn.innerHTML = '<i class="fa fa-stop"></i><span>停止播放</span>';
+                voiceOutputBtn.classList.add('bg-red-500', 'hover:bg-red-600');
+            } else {
+                voiceIndicator.className = 'voice-indicator ready';
+                voiceStatusText.textContent = '语音交互准备就绪';
+                voiceInputBtn.innerHTML = '<i class="fa fa-microphone"></i><span>语音输入</span>';
+                voiceInputBtn.classList.remove('bg-red-500', 'hover:bg-red-600');
+                voiceOutputBtn.innerHTML = '<i class="fa fa-volume-up"></i><span>语音播放</span>';
+                voiceOutputBtn.classList.remove('bg-red-500', 'hover:bg-red-600');
+            }
+        }
+
+        // 显示语音错误
+        function showVoiceError(error) {
+            const voiceIndicator = document.getElementById('voice-indicator');
+            const voiceStatusText = document.getElementById('voice-status-text');
+
+            voiceIndicator.className = 'voice-indicator ready';
+
+            switch(error) {
+                case 'not-allowed':
+                case 'permission-denied':
+                    voiceStatusText.textContent = '麦克风权限被拒绝';
+                    break;
+                case 'not-supported':
+                    voiceStatusText.textContent = '浏览器不支持语音功能';
+                    break;
+                case 'no-speech':
+                    voiceStatusText.textContent = '未检测到语音';
+                    break;
+                case 'synthesis-error':
+                    voiceStatusText.textContent = '语音合成失败';
+                    break;
+                default:
+                    voiceStatusText.textContent = '语音功能错误';
+            }
+
+            // 3秒后恢复
+            setTimeout(() => {
+                if (!isListening && !isSpeaking) {
+                    voiceStatusText.textContent = '语音交互准备就绪';
+                }
+            }, 3000);
+        }
+
+        // ==================== 语音设置系统 ====================
+        function initializeVoiceSettings() {
+            const toggleSettingsBtn = document.getElementById('toggle-settings');
+            const voiceSettings = document.getElementById('voice-settings');
+            const applySettingsBtn = document.getElementById('apply-settings');
+            const resetSettingsBtn = document.getElementById('reset-settings');
+
+            // 滑块元素
+            const speechRate = document.getElementById('speech-rate');
+            const rateValue = document.getElementById('rate-value');
+            const speechVolume = document.getElementById('speech-volume');
+            const volumeValue = document.getElementById('volume-value');
+            const speechPitch = document.getElementById('speech-pitch');
+            const pitchValue = document.getElementById('pitch-value');
+
+            // 更新滑块显示值
+            speechRate.addEventListener('input', function() {
+                rateValue.textContent = this.value + 'x';
+            });
+
+            speechVolume.addEventListener('input', function() {
+                volumeValue.textContent = Math.round(this.value * 100) + '%';
+            });
+
+            speechPitch.addEventListener('input', function() {
+                pitchValue.textContent = this.value;
+            });
+
+            // 切换设置面板
+            toggleSettingsBtn.addEventListener('click', function() {
+                const isHidden = voiceSettings.classList.toggle('hidden');
+                this.innerHTML = isHidden
+                    ? '<i class="fa fa-cog"></i><span>语音设置</span><i class="fa fa-chevron-down text-xs"></i>'
+                    : '<i class="fa fa-times"></i><span>关闭设置</span><i class="fa fa-chevron-up text-xs"></i>';
+            });
+
+            // 应用设置
+            applySettingsBtn.addEventListener('click', function() {
+                const settings = getVoiceSettings();
+                localStorage.setItem('aphasiaVoiceSettings', JSON.stringify(settings));
+
+                // 显示成功消息
+                const voiceStatusText = document.getElementById('voice-status-text');
+                const originalText = voiceStatusText.textContent;
+                voiceStatusText.textContent = '语音设置已保存';
+
+                setTimeout(() => {
+                    if (!isListening && !isSpeaking) {
+                        voiceStatusText.textContent = originalText;
+                    }
+                }, 2000);
+
+                // 关闭设置面板
+                voiceSettings.classList.add('hidden');
+                toggleSettingsBtn.innerHTML = '<i class="fa fa-cog"></i><span>语音设置</span><i class="fa fa-chevron-down text-xs"></i>';
+            });
+
+            // 重置设置
+            resetSettingsBtn.addEventListener('click', function() {
+                speechRate.value = 1;
+                speechVolume.value = 0.8;
+                speechPitch.value = 1;
+
+                rateValue.textContent = '1.0x';
+                volumeValue.textContent = '80%';
+                pitchValue.textContent = '1.0';
+
+                localStorage.removeItem('aphasiaVoiceSettings');
+
+                // 显示重置消息
+                const voiceStatusText = document.getElementById('voice-status-text');
+                const originalText = voiceStatusText.textContent;
+                voiceStatusText.textContent = '语音设置已重置';
+
+                setTimeout(() => {
+                    if (!isListening && !isSpeaking) {
+                        voiceStatusText.textContent = originalText;
+                    }
+                }, 2000);
+            });
+
+            // 加载保存的设置
+            loadVoiceSettings();
+        }
+
+        // 获取当前语音设置
+        function getVoiceSettings() {
+            return {
+                rate: parseFloat(document.getElementById('speech-rate').value),
+                volume: parseFloat(document.getElementById('speech-volume').value),
+                pitch: parseFloat(document.getElementById('speech-pitch').value)
+            };
+        }
+
+        // 加载语音设置
+        function loadVoiceSettings() {
+            const savedSettings = localStorage.getItem('aphasiaVoiceSettings');
+            if (savedSettings) {
+                try {
+                    const settings = JSON.parse(savedSettings);
+
+                    const speechRate = document.getElementById('speech-rate');
+                    const rateValue = document.getElementById('rate-value');
+                    const speechVolume = document.getElementById('speech-volume');
+                    const volumeValue = document.getElementById('volume-value');
+                    const speechPitch = document.getElementById('speech-pitch');
+                    const pitchValue = document.getElementById('pitch-value');
+
+                    if (speechRate && settings.rate) {
+                        speechRate.value = settings.rate;
+                        rateValue.textContent = settings.rate + 'x';
+                    }
+
+                    if (speechVolume && settings.volume) {
+                        speechVolume.value = settings.volume;
+                        volumeValue.textContent = Math.round(settings.volume * 100) + '%';
+                    }
+
+                    if (speechPitch && settings.pitch) {
+                        speechPitch.value = settings.pitch;
+                        pitchValue.textContent = settings.pitch;
+                    }
+
+                } catch (error) {
+                    console.error('加载语音设置失败:', error);
+                }
+            }
+        }
+
+        // ==================== Wernicke失语症语言生成引擎 ====================
+        class WernickeLanguageGenerator {
+            constructor() {
+                // 新语词汇库（无意义的词语组合或语音，已本土化）
+                this.neologisms = [
+                    "巴拉", "哈哈", "彩虹", "叮咚", "冬瓜", "嘟嘟", "飞飞", "风铃", "咕噜", "光影",
+                    "哈哈", "哗啦", "幻彩", "叽喳", "咔嚓", "空空", "啦啦", "灵韵", "流水", "隆隆",
+                    "露珠", "乱乱", "朦胧", "喵喵", "啪嗒", "飘渺", "扑通", "七彩", "奇奇", "清风",
+                    "沙沙", "闪烁", "水滴", "丝丝", "松松", "跳跳", "嗡嗡", "嘻嘻", "细雨", "星辰",
+                    "虚幻", "呀呀", "阳光", "依依", "盈盈", "幽幽", "云朵", "云缈", "吱吱", "转转","哈的"
+                ];
+
+                // 语义错语映射（真实词汇的错误替换）
+                this.semanticParaphasias = {
+                    // 人名/称谓替换
+                    "名字": ["代号", "那个字", "称呼", "牌子", "记号"],
+                    "我": ["他", "她", "咱们", "那个人", "那边"],
+                    "你": ["我", "他", "她", "咱们", "那些人"],
+                    "医生": ["老师", "师傅", "看门的", "那个穿白衣服的", "管事的"],
+
+                    // 日常物品替换
+                    "桌子": ["板凳", "台面", "木头", "那个架子", "平地"],
+                    "椅子": ["床", "柜子", "坐的地方", "台阶", "箱子"],
+                    "窗户": ["门", "镜子", "窟窿", "透气的", "画框"],
+                    "门": ["墙", "口子", "路", "盖子", "帘子"],
+                    "水": ["汤", "雨", "那个流的东西", "酒", "油"],
+                    "饭": ["米", "菜", "东西", "那个吃的", "碗"],
+
+                    // 场所相关
+                    "医院": ["工厂", "学校", "家里", "那个大楼", "商店"],
+                    "家": ["房子", "窝", "那个地方", "旅馆", "房间"],
+                    "哪里": ["这里", "那边", "什么地方", "位置", "方向"],
+
+                    // 动作/状态替换
+                    "感觉": ["听见", "看见", "摸到", "以为", "猜"],
+                    "知道": ["认识", "看见", "听说", "觉得", "想"],
+                    "吃饭": ["喝水", "睡觉", "走路", "说话", "看书"],
+                    "睡觉": ["躺着", "闭眼", "休息", "停下", "倒下"],
+
+                    // 时间相关
+                    "今天": ["昨天", "明天", "刚才", "以后", "那个时候"],
+                    "昨天": ["今天", "以前", "很久", "刚刚", "那时候"],
+                    "现在": ["过去", "将来", "马上", "等会儿", "一直"]
+                };
+
+                // 形容词库（日常高频）
+                this.adjectives = [
+                    "漂亮的", "奇怪的", "红色的", "大的", "小的", "好的", "坏的",
+                    "高兴的", "难过的", "快的", "慢的", "热的", "冷的", "硬的",
+                    "软的", "圆的", "方的", "新的", "旧的", "吵的", "安静的",
+                    "贵的", "便宜的", "重的", "轻的", "高的", "矮的", "远的",
+                    "近的", "甜的", "苦的", "香的", "臭的", "清楚的", "模糊的"
+                ];
+
+                // 名词库（生活常见）
+                this.nouns = [
+                    "电视", "手机", "水杯", "筷子", "衣服", "鞋子", "门", "窗户", "太阳", "月亮",
+                    "车", "公共汽车", "地铁", "超市", "菜市场", "苹果", "香蕉", "米饭", "面条", "包子",
+                    "猫", "狗", "鸟", "鱼", "树", "花", "草", "水", "云", "风",
+                    "桌子", "椅子", "床", "灯", "书", "笔", "纸", "包", "眼镜", "手表",
+                    "头", "手", "脚", "眼睛", "耳朵", "嘴巴", "头发", "肚子", "心", "脑子"
+                ];
+
+                // 动词库（基本动作）
+                this.verbs = [
+                    "跑", "跳", "吃", "喝", "看", "听", "说", "写", "买", "卖",
+                    "坐", "站", "走", "飞", "睡", "醒", "笑", "哭", "想", "做",
+                    "打", "拿", "放", "找", "给", "要", "穿", "脱", "洗", "刷",
+                    "开", "关", "上", "下", "进", "出", "回", "去", "来", "到",
+                    "爱", "恨", "怕", "懂", "会", "能", "敢", "肯", "愿", "像"
+                ];
+
+                // 连接词和填充词（符合中文口语习惯）
+                this.conjunctions = [
+                    "然后", "接着", "但是", "可是", "所以", "因为", "而且", "或者",
+                    "其实", "本来", "结果", "反正", "大概", "也许", "可能", "一般",
+                    "好像", "就像", "比如说", "就是", "那个", "嗯", "啊", "哦",
+                    "你看", "我说", "听着", "对吧", "是不是", "有没有"
+                ];
+
+                // 语法模板（模拟中文流利性失语的语序混乱和空洞）
+                this.templates = [
+                    "$NOUN在$VERB，然后$ADJ的$NOUN就$VERB了。",
+                    "我觉得$NOUN特别$ADJ，因为$NOUN总是$VERB。",
+                    "虽然$NOUN很$ADJ，但是$NOUN不能$VERB，你知道吗？",
+                    "那个$NOUN啊，它就是用来$VERB那个$ADJ的$NOUN的。",
+                    "你看，$ADJ的$NOUN正在$VERB，就像$NOUN一样。",
+                    "如果$NOUN$VERB了$NOUN，那$NOUN肯定会$ADJ的。",
+                    "我跟你说，$NOUN和$NOUN在$VERB，真的太$ADJ了。",
+                    "$VERB一下$NOUN，你会觉得很$ADJ，真的。",
+                    "哪里有$ADJ的$NOUN？就在$NOUN$VERB的地方。",
+                    "因为$NOUN太$ADJ了，所以我们只能$VERB$NOUN。"
+                ];
+
+                // 持续的词语（用于持续言语症状，中文口头禅）
+                this.perseverationWords = [
+                    "对对对", "就是那个", "你知道的", "那个什么", "怎么说呢",
+                    "哎呀", "好的", "没错", "是的是的", "然后呢", "那个",
+                    "真的", "确实", "行吧", "算了吧"
+                ];
+
+                this.conversationHistory = [];
+                this.stats = {
+                    neologisms: 0,
+                    paraphasias: 0,
+                    perseverations: 0,
+                    totalWords: 0
+                };
+            }
+
+            // 获取随机新语
+            getRandomNeologism() {
+                this.stats.neologisms++;
+                return this.neologisms[Math.floor(Math.random() * this.neologisms.length)];
+            }
+
+            // 获取语义错语替换
+            getRandomParaphasia(word, category = 'general') {
+                const normalizedWord = word.replace(/[.,!?]/g, '');
+
+                // 检查是否有特定的错语映射
+                if (this.semanticParaphasias[normalizedWord]) {
+                    this.stats.paraphasias++;
+                    const options = this.semanticParaphasias[normalizedWord];
+                    return options[Math.floor(Math.random() * options.length)];
+                }
+
+                // 如果没有特定映射，根据词性返回相关词
+                const allWords = [...this.nouns, ...this.verbs, ...this.adjectives];
+                this.stats.paraphasias++;
+                return allWords[Math.floor(Math.random() * allWords.length)];
+            }
+
+            // 获取持续言语词语
+            getPerseverationWord() {
+                this.stats.perseverations++;
+                return this.perseverationWords[Math.floor(Math.random() * this.perseverationWords.length)];
+            }
+
+            // 生成Wernicke失语症回答
+            generateResponse(question, confusionLevel = 7, neologismRate = 70, paraphasiaRate = 60, saladRate = 40) {
+                // 基于问题和混乱程度生成回答
+                let response = "";
+
+                // 决定回答的句子数量（1-4句）
+                const sentenceCount = Math.min(4, Math.floor(confusionLevel / 3) + 1);
+
+                for (let i = 0; i < sentenceCount; i++) {
+                    if (response.length > 0) {
+                        response += " ";
+                    }
+
+                    // 根据混乱度决定生成策略
+                    if (Math.random() * 100 < saladRate && confusionLevel > 5) {
+                        // 语词沙拉模式（完全混乱）
+                        response += this.generateWordSalad(confusionLevel);
+                    } else {
+                        // 模板生成模式（部分结构）
+                        response += this.generateTemplateSentence(confusionLevel, neologismRate, paraphasiaRate);
+                    }
+
+                    // 添加持续言语
+                    if (Math.random() * 100 < 30 && confusionLevel > 3) {
+                        response += "，" + this.getPerseverationWord() + "，" + this.getPerseverationWord();
+                    }
+                }
+
+                // 添加结尾的新语或错语
+                if (Math.random() * 100 < neologismRate && confusionLevel > 2) {
+                    response += "，" + this.getRandomNeologism() + "。";
+                } else {
+                    response += "。";
+                }
+
+                // 更新统计
+                const words = response.split(/[,.!?;:，。！？；：\s]+/).filter(w => w.length > 0);
+                this.stats.totalWords += words.length;
+
+                return response;
+            }
+
+            // 生成模板句子
+            generateTemplateSentence(confusionLevel, neologismRate, paraphasiaRate) {
+                const template = this.templates[Math.floor(Math.random() * this.templates.length)];
+                let sentence = template;
+
+                // 根据混乱度决定替换策略
+                const confusionFactor = confusionLevel / 10; // 0.1到1.0
+
+                // 替换形容词
+                sentence = sentence.replace(/\$ADJ/g, () => {
+                    if (Math.random() * 100 < paraphasiaRate * confusionFactor) {
+                        return this.getRandomParaphasia("形容词", "adjective");
+                    }
+                    if (Math.random() * 100 < neologismRate * confusionFactor) {
+                        return this.getRandomNeologism();
+                    }
+                    return this.adjectives[Math.floor(Math.random() * this.adjectives.length)];
+                });
+
+                // 替换名词
+                sentence = sentence.replace(/\$NOUN/g, () => {
+                    if (Math.random() * 100 < neologismRate * confusionFactor) {
+                        return this.getRandomNeologism();
+                    }
+                    if (Math.random() * 100 < paraphasiaRate * confusionFactor) {
+                        return this.getRandomParaphasia("名词", "noun");
+                    }
+                    return this.nouns[Math.floor(Math.random() * this.nouns.length)];
+                });
+
+                // 替换动词
+                sentence = sentence.replace(/\$VERB/g, () => {
+                    if (Math.random() * 100 < paraphasiaRate * confusionFactor) {
+                        return this.getRandomParaphasia("动词", "verb");
+                    }
+                    return this.verbs[Math.floor(Math.random() * this.verbs.length)];
+                });
+
+                // 替换连接词
+                sentence = sentence.replace(/\$CONJ/g, () => {
+                    if (Math.random() * 100 < 30 * confusionFactor) {
+                        return this.getRandomNeologism();
+                    }
+                    return this.conjunctions[Math.floor(Math.random() * this.conjunctions.length)];
+                });
+
+                return sentence;
+            }
+
+            // 生成语词沙拉（完全混乱）
+            generateWordSalad(confusionLevel) {
+                const wordCount = 5 + Math.floor(confusionLevel / 2); // 5-10个词
+                let salad = "";
+
+                for (let i = 0; i < wordCount; i++) {
+                    if (salad.length > 0) {
+                        salad += " ";
+                    }
+
+                    // 随机选择词类
+                    const wordType = Math.random();
+                    if (wordType < 0.3) {
+                        salad += this.getRandomNeologism();
+                    } else if (wordType < 0.6) {
+                        salad += this.nouns[Math.floor(Math.random() * this.nouns.length)];
+                    } else if (wordType < 0.8) {
+                        salad += this.verbs[Math.floor(Math.random() * this.verbs.length)];
+                    } else {
+                        salad += this.adjectives[Math.floor(Math.random() * this.adjectives.length)];
+                    }
+                }
+
+                return salad;
+            }
+
+            // 获取统计信息
+            getStats() {
+                return {
+                    ...this.stats,
+                    neologismPercentage: this.stats.totalWords > 0 ?
+                        Math.round((this.stats.neologisms / this.stats.totalWords) * 100) : 0,
+                    paraphasiaPercentage: this.stats.totalWords > 0 ?
+                        Math.round((this.stats.paraphasias / this.stats.totalWords) * 100) : 0,
+                    perseverationPercentage: this.stats.totalWords > 0 ?
+                        Math.round((this.stats.perseverations / this.stats.totalWords) * 100) : 0
+                };
+            }
+
+            // 重置统计
+            resetStats() {
+                this.stats = {
+                    neologisms: 0,
+                    paraphasias: 0,
+                    perseverations: 0,
+                    totalWords: 0
+                };
+            }
+        }
+
+        // ==================== 对话模拟系统 ====================
+        // Broca失语症回应生成函数（电报式语言，省略虚词）
+        function generateBrocaResponse(question) {
+            const responses = {
+                '你今天感觉怎么样？': '... 好 ... 还行 ...',
+                '你能告诉我你的名字吗？': '... 我 ... 叫 ... 名 ...',
+                '你想吃点什么？': '... 水 ... 苹果 ... 吃 ...',
+                '你今天去了哪里？': '... 医院 ... 检查 ... 去 ...',
+                '你多大年纪了？': '... 五 ... 十 ... 岁 ...',
+                '你能听懂我说话吗？': '... 懂 ... 是 ...',
+                '你需要帮助吗？': '... 帮 ... 忙 ... 谢 ...',
+                '你记得昨天发生了什么吗？': '... 头 ... 疼 ... 晕 ...',
+                '你住在哪里？': '... 家 ... 房子 ... 住 ...'
+            };
+
+            const defaultResponses = [
+                '... 难 ... 说 ...',
+                '... 是 ... 不 ...',
+                '... 听 ... 不 ...',
+                '... 再 ... 说 ...',
+                '... 谢 ... 谢 ... 医 ...'
+            ];
+
+            return responses[question] || defaultResponses[Math.floor(Math.random() * defaultResponses.length)];
+        }
+
+        // ==================== 主程序逻辑 ====================
+        document.addEventListener('DOMContentLoaded', function() {
+            // 初始化Wernicke语言生成器
+            const wernickeGenerator = new WernickeLanguageGenerator();
+
+            // 页面加载动画
+            document.body.classList.add('fade-in');
+
+            // 初始化语音系统
+            initializeSpeechRecognition();
+            initializeVoiceSettings();
+
+            // 滚动触发动画
+            const scrollElements = document.querySelectorAll('.scroll-trigger');
+
+            const handleScrollAnimation = () => {
+                scrollElements.forEach((el) => {
+                    const elementTop = el.getBoundingClientRect().top;
+                    if (elementTop <= (window.innerHeight || document.documentElement.clientHeight) / 1.25) {
+                        el.classList.add('scroll-visible');
+                    }
+                });
+            };
+
+            handleScrollAnimation();
+            window.addEventListener('scroll', handleScrollAnimation);
+
+            // 导航栏滚动效果
+            window.addEventListener('scroll', function() {
+                const navbar = document.getElementById('navbar');
+                if (window.scrollY > 100) {
+                    navbar.classList.add('py-2', 'shadow-md');
+                    navbar.classList.remove('py-3', 'shadow-sm');
+                } else {
+                    navbar.classList.add('py-3', 'shadow-sm');
+                    navbar.classList.remove('py-2', 'shadow-md');
+                }
+            });
+
+            // 移动端菜单切换
+            const menuToggle = document.getElementById('menu-toggle');
+            const mobileMenu = document.getElementById('mobile-menu');
+
+            menuToggle.addEventListener('click', function() {
+                mobileMenu.classList.toggle('hidden');
+                menuToggle.innerHTML = mobileMenu.classList.contains('hidden')
+                    ? '<i class="fa fa-bars text-2xl"></i>'
+                    : '<i class="fa fa-times text-2xl"></i>';
+            });
+
+            // 平滑滚动
+            document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+                anchor.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    const targetId = this.getAttribute('href');
+                    if (targetId === '#') return;
+
+                    const targetElement = document.querySelector(targetId);
+                    if (targetElement) {
+                        window.scrollTo({
+                            top: targetElement.offsetTop - 80,
+                            behavior: 'smooth'
+                        });
+
+                        // 关闭移动端菜单
+                        if (!mobileMenu.classList.contains('hidden')) {
+                            mobileMenu.classList.add('hidden');
+                            menuToggle.innerHTML = '<i class="fa fa-bars text-2xl"></i>';
+                        }
+                    }
+                });
+            });
+
+            // 大脑图像缩放控制
+            const brainImage = document.getElementById('brain-static');
+            const zoomInBtn = document.getElementById('zoomIn');
+            const zoomOutBtn = document.getElementById('zoomOut');
+            const resetBtn = document.getElementById('reset');
+            const zoomLevel = document.getElementById('zoom-level');
+
+            let scale = 1;
+            const scaleStep = 0.2;
+            const maxScale = 3;
+            const minScale = 0.5;
+
+            function updateZoom() {
+                if (brainImage) {
+                    brainImage.style.transform = `scale(${scale})`;
+                    zoomLevel.textContent = `${Math.round(scale * 100)}%`;
+
+                    if (scale > 1) {
+                        brainImage.classList.add('zoomed');
+                    } else {
+                        brainImage.classList.remove('zoomed');
+                    }
+                }
+            }
+
+            if (zoomInBtn && brainImage) {
+                zoomInBtn.addEventListener('click', function() {
+                    if (scale < maxScale) {
+                        scale += scaleStep;
+                        updateZoom();
+                    }
+                });
+            }
+
+            if (zoomOutBtn && brainImage) {
+                zoomOutBtn.addEventListener('click', function() {
+                    if (scale > minScale) {
+                        scale -= scaleStep;
+                        updateZoom();
+                    }
+                });
+            }
+
+            if (resetBtn && brainImage) {
+                resetBtn.addEventListener('click', function() {
+                    scale = 1;
+                    updateZoom();
+                });
+            }
+
+            // 鼠标滚轮缩放
+            if (brainImage) {
+                brainImage.addEventListener('wheel', function(e) {
+                    e.preventDefault();
+                    if (e.deltaY < 0 && scale < maxScale) {
+                        scale += scaleStep;
+                    } else if (e.deltaY > 0 && scale > minScale) {
+                        scale -= scaleStep;
+                    }
+                    updateZoom();
+                });
+            }
+
+            // ==================== 对话模拟逻辑 ====================
+            const aphasiaTypeSelect = document.getElementById('aphasia-type');
+            const userQuestion = document.getElementById('user-question');
+            const sendButton = document.getElementById('send-question');
+            const conversationContainer = document.getElementById('conversation-container');
+            const currentMode = document.getElementById('current-mode');
+            const sampleQuestions = document.querySelectorAll('.sample-question');
+            const voiceInputBtn = document.getElementById('voice-input-btn');
+            const voiceOutputBtn = document.getElementById('voice-output-btn');
+
+            // Wernicke控制元素
+            const confusionLevelSlider = document.getElementById('confusion-level');
+            const confusionLevelValue = document.getElementById('confusion-level-value');
+            const neologismSlider = document.getElementById('neologism-slider');
+            const neologismPercent = document.getElementById('neologism-percent');
+            const paraphasiaSlider = document.getElementById('paraphasia-slider');
+            const paraphasiaPercent = document.getElementById('paraphasia-percent');
+            const saladSlider = document.getElementById('salad-slider');
+            const saladPercent = document.getElementById('salad-percent');
+            const wernickeControls = document.getElementById('wernicke-controls');
+            const neologismCount = document.getElementById('neologism-count');
+            const paraphasiaCount = document.getElementById('paraphasia-count');
+            const conversationStats = document.getElementById('conversation-stats');
+
+            // 更新混乱度显示
+            if (confusionLevelSlider) {
+                confusionLevelSlider.addEventListener('input', function() {
+                    const level = parseInt(this.value);
+                    let levelText = '';
+
+                    if (level <= 3) levelText = '轻微';
+                    else if (level <= 6) levelText = '中等';
+                    else if (level <= 8) levelText = '重度';
+                    else levelText = '极重度';
+
+                    confusionLevelValue.textContent = `${levelText} (${level})`;
+                });
+            }
+
+            // 更新新语比例显示
+            if (neologismSlider) {
+                neologismSlider.addEventListener('input', function() {
+                    neologismPercent.textContent = this.value + '%';
+                });
+            }
+
+            // 更新错语密度显示
+            if (paraphasiaSlider) {
+                paraphasiaSlider.addEventListener('input', function() {
+                    paraphasiaPercent.textContent = this.value + '%';
+                });
+            }
+
+            // 更新语词沙拉程度显示
+            if (saladSlider) {
+                saladSlider.addEventListener('input', function() {
+                    saladPercent.textContent = this.value + '%';
+                });
+            }
+
+            // 失语症类型切换
+            if (aphasiaTypeSelect) {
+                aphasiaTypeSelect.addEventListener('change', function() {
+                    const selectedType = this.value;
+                    const typeText = selectedType === 'broca' ? 'Broca失语症' : 'Wernicke失语症';
+                    currentMode.textContent = `当前模式：${typeText}`;
+                    currentMode.className = selectedType === 'broca'
+                        ? 'px-3 py-1 bg-primary/10 text-primary text-sm rounded-full'
+                        : 'px-3 py-1 bg-secondary/10 text-secondary text-sm rounded-full';
+
+                    // 显示/隐藏Wernicke控制面板
+                    if (wernickeControls) {
+                        wernickeControls.style.display = selectedType === 'wernicke' ? 'block' : 'none';
+                    }
+                });
+            }
+
+            // 示例问题点击事件
+            sampleQuestions.forEach(button => {
+                button.addEventListener('click', function() {
+                    userQuestion.value = this.getAttribute('data-question');
+                    userQuestion.focus();
+                });
+            });
+
+            // 语音输入按钮事件
+            if (voiceInputBtn) {
+                voiceInputBtn.addEventListener('click', function() {
+                    if (!speechRecognition && !initializeSpeechRecognition()) {
+                        return;
+                    }
+
+                    if (isListening) {
+                        speechRecognition.stop();
+                    } else {
+                        try {
+                            speechRecognition.start();
+                        } catch (error) {
+                            console.error('启动语音识别失败:', error);
+                            showVoiceError('start-failed');
+                        }
+                    }
+                });
+            }
+
+            // 语音输出按钮事件
+            if (voiceOutputBtn) {
+                voiceOutputBtn.addEventListener('click', function() {
+                    if (isSpeaking) {
+                        speechSynthesis.cancel();
+                    } else {
+                        const lastBotMessage = document.querySelector('#conversation-container .wernicke-message:last-child p, #conversation-container .bg-light:last-child p');
+                        if (lastBotMessage) {
+                            const settings = getVoiceSettings();
+                            const text = lastBotMessage.textContent.replace(/混乱度: \d+/, '').trim();
+                            speakText(text, {
+                                rate: settings.rate,
+                                volume: settings.volume,
+                                pitch: settings.pitch
+                            });
+                        } else {
+                            showVoiceError('no-content');
+                        }
+                    }
+                });
+            }
+
+            // 发送问题
+            if (sendButton) {
+                sendButton.addEventListener('click', sendQuestion);
+            }
+
+            // 按Enter键发送问题
+            if (userQuestion) {
+                userQuestion.addEventListener('keydown', function(e) {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        sendQuestion();
+                    }
+                });
+            }
+
+            function sendQuestion() {
+                const question = userQuestion.value.trim();
+                if (!question) return;
+
+                // 添加用户消息
+                addMessageToConversation('user', question);
+                userQuestion.value = '';
+
+                // 模拟响应
+                setTimeout(() => {
+                    const selectedType = aphasiaTypeSelect.value;
+                    let response = '';
+
+                    if (selectedType === 'broca') {
+                        response = generateBrocaResponse(question);
+                    } else {
+                        // 获取Wernicke设置
+                        const confusionLevel = parseInt(confusionLevelSlider.value);
+                        const neologismRate = parseInt(neologismSlider.value);
+                        const paraphasiaRate = parseInt(paraphasiaSlider.value);
+                        const saladRate = parseInt(saladSlider.value);
+
+                        response = wernickeGenerator.generateResponse(
+                            question,
+                            confusionLevel,
+                            neologismRate,
+                            paraphasiaRate,
+                            saladRate
+                        );
+                    }
+
+                    addMessageToConversation('bot', response, selectedType);
+
+                    // 更新统计信息
+                    if (selectedType === 'wernicke') {
+                        const stats = wernickeGenerator.getStats();
+                        neologismCount.textContent = stats.neologisms;
+                        paraphasiaCount.textContent = stats.paraphasias;
+                    }
+
+                    // 自动语音输出
+                    setTimeout(() => {
+                        const settings = getVoiceSettings();
+                        speakText(response, {
+                            rate: settings.rate,
+                            volume: settings.volume,
+                            pitch: settings.pitch
+                        });
+                    }, 300);
+                }, 800);
+            }
+
+            // 添加消息到对话
+            function addMessageToConversation(sender, message, type = 'broca') {
+                const messageDiv = document.createElement('div');
+                messageDiv.className = 'flex items-start gap-4';
+
+                if (sender === 'user') {
+                    messageDiv.classList.add('justify-end');
+                    messageDiv.innerHTML = `
+                        <div class="bg-primary/10 p-4 rounded-2xl rounded-tr-none max-w-[80%]">
+                            <p class="text-gray-800">${message}</p>
+                        </div>
+                        <div class="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center flex-shrink-0">
+                            <i class="fa fa-user text-primary"></i>
+                        </div>
+                    `;
+                } else {
+                    const isWernicke = type === 'wernicke';
+                    const confusionLevel = isWernicke ? parseInt(confusionLevelSlider.value) : 0;
+
+                    messageDiv.innerHTML = `
+                        <div class="w-10 h-10 ${isWernicke ? 'bg-secondary/10' : 'bg-primary/10'} rounded-full flex items-center justify-center flex-shrink-0">
+                            <i class="fa fa-user-md ${isWernicke ? 'text-secondary' : 'text-primary'}"></i>
+                        </div>
+                        <div class="${isWernicke ? 'wernicke-message' : 'bg-light'} p-4 rounded-2xl rounded-tl-none max-w-[80%]">
+                            <p class="text-gray-700">
+                                ${message}
+                                ${isWernicke ? `<span class="confusion-indicator">混乱度: ${confusionLevel}</span>` : ''}
+                            </p>
+                        </div>
+                    `;
+                }
+
+                conversationContainer.appendChild(messageDiv);
+                conversationContainer.scrollTop = conversationContainer.scrollHeight;
+            }
+
+            // 初始化设置
+            if (confusionLevelSlider) confusionLevelSlider.dispatchEvent(new Event('input'));
+            if (neologismSlider) neologismSlider.dispatchEvent(new Event('input'));
+            if (paraphasiaSlider) paraphasiaSlider.dispatchEvent(new Event('input'));
+            if (saladSlider) saladSlider.dispatchEvent(new Event('input'));
+
+            // 默认选择Wernicke失语症
+            if (aphasiaTypeSelect) {
+                aphasiaTypeSelect.value = 'wernicke';
+                aphasiaTypeSelect.dispatchEvent(new Event('change'));
+            }
+        });
+    </script>
+</body>
+</html>
